@@ -65,6 +65,12 @@ const COLORS = {
     sage: ['Sage', 0xb7c0a7, 0xbbc5ab],
     lavender: ['Lavender', 0xcfbfe0, 0xd8c9e6],
   },
+  air: {
+    spaceBlack: ['Space Black', 0x2e2e30, 0x303033],
+    cloudWhite: ['Cloud White', 0xe9e9e6, 0xf4f4f2],
+    lightGold: ['Light Gold', 0xe6d6b8, 0xf0e4cc],
+    skyBlue: ['Sky Blue', 0xc5d6e6, 0xd3e1ee],
+  },
   '17pro': {
     silver: ['Silver', 0xd9d9d9, 0xe3e4e5],
     cosmicOrange: ['Cosmic Orange', 0xe2662c, 0xf07a35],
@@ -74,7 +80,7 @@ const COLORS = {
 
 // Design of each generation.
 //   frame: aluminium | steel | titanium      back: gloss | matte
-//   camera: diagonal | vertical | pill | triple | plateau
+//   camera: diagonal | vertical | pill | triple | plateau | bar
 //   cutout: notch | island                   port: lightning | usbc
 //   button: switch (mute switch) | action    cameraControl: has the Camera Control button
 //   bezel: screen border in mm
@@ -88,6 +94,7 @@ const FAMILIES = {
   16: { frame: 'aluminium', back: 'matte', camera: 'pill', cutout: 'island', port: 'usbc', button: 'action', cameraControl: true, bezel: 2.3 },
   '16pro': { frame: 'titanium', back: 'matte', camera: 'triple', cutout: 'island', port: 'usbc', button: 'action', cameraControl: true, bezel: 1.9 },
   17: { frame: 'aluminium', back: 'matte', camera: 'pill', cutout: 'island', port: 'usbc', button: 'action', cameraControl: true, bezel: 1.9 },
+  air: { frame: 'titanium', back: 'matte', camera: 'bar', cutout: 'island', port: 'usbc', button: 'action', cameraControl: true, bezel: 1.9 },
   '17pro': { frame: 'aluminium', back: 'matte', camera: 'plateau', cutout: 'island', port: 'usbc', button: 'action', cameraControl: true, bezel: 1.9 },
 };
 
@@ -98,6 +105,7 @@ const model = (id, name, family, size, screen) => ({
 export const MODELS = [
   model('17promax', 'iPhone 17 Pro Max', '17pro', [78.0, 163.4, 8.75], [1320, 2868]),
   model('17pro', 'iPhone 17 Pro', '17pro', [71.9, 150.0, 8.75], [1206, 2622]),
+  model('air', 'iPhone Air', 'air', [74.7, 156.2, 5.64], [1260, 2736]),
   model('17', 'iPhone 17', 17, [71.5, 149.6, 7.95], [1206, 2622]),
   model('16promax', 'iPhone 16 Pro Max', '16pro', [77.6, 163.0, 8.25], [1320, 2868]),
   model('16pro', 'iPhone 16 Pro', '16pro', [71.5, 149.6, 8.25], [1206, 2622]),

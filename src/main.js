@@ -57,7 +57,7 @@ let selected = 0;
 const sel = () => phones[selected];
 
 $('model').innerHTML = [17, 16, 15, 14, 13].map((gen) => {
-  const options = MODELS.filter((m) => m.name.startsWith(`iPhone ${gen}`))
+  const options = MODELS.filter((m) => m.name.startsWith(`iPhone ${gen}`) || (gen === 17 && m.id === 'air'))
     .map((m) => `<option value="${m.id}">${m.name}</option>`);
   if (gen === 14) options.unshift(`<option value="${DETAILED}">iPhone 14 Pro (detailed)</option>`);
   return `<optgroup label="iPhone ${gen}">${options.join('')}</optgroup>`;

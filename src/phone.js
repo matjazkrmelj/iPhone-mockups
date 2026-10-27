@@ -283,6 +283,15 @@ export function createPhone(spec) {
     flash(-W / 2 + 0.09, cy + k * 0.8, z);
     lidar(-W / 2 + 0.09, cy - k * 0.8, z);
     mic(-W / 2 + 0.09, cy, z);
+  } else if (spec.camera === 'bar') {
+    // iPhone Air: a rounded bar across the top with one lens on the left and the flash on the right.
+    const ph = H * 0.165;
+    const bw = W - 0.06;
+    const cy = H / 2 - 0.03 - ph / 2;
+    const z = addBump(bw, ph, ph / 2, 0, cy, frameMat);
+    lens(bw / 2 - ph / 2, cy, z, ph * 0.33);
+    flash(-bw / 2 + ph / 2, cy, z, 0.02);
+    mic(-bw / 2 + ph / 2 + 0.07, cy, z);
   }
 
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });

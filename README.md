@@ -2,7 +2,7 @@
 
 ![Example export](docs/example-export.png)
 
-A local web app that renders 3D iPhones (iPhone 13 to iPhone 17, in every size) with your own screenshots on the display, lets you rotate them on the X/Y/Z axes, and exports the view as a PNG.
+A local web app that renders 3D iPhones (iPhone 13 to iPhone 17 and iPhone Air, in every size) with your own screenshots on the display, lets you rotate them on the X/Y/Z axes, and exports the view as a PNG.
 
 ## Run it
 
@@ -22,7 +22,7 @@ To build a static version: `npm run build` (output in `dist/`, serve with `npm r
 ## Features
 
 - **Phones**: up to three phones in one scene, each with its own model, colour, screenshot, rotation and position. Click a phone (or its tab) to select it; the sidebar edits the selected phone. *Spacing* sets the gap between them.
-- **Models**: iPhone 13, 14, 15, 16 and 17 in the regular, Plus, Pro and Pro Max sizes (13 Pro Max, not 13 Plus), built procedurally from Apple's published dimensions with each generation's notch or Dynamic Island, camera layout, port, buttons and colours. *iPhone 14 Pro (detailed)* is a full 3D model and is the default.
+- **Models**: iPhone 13, 14, 15, 16 and 17 in the regular, Plus, Pro and Pro Max sizes (13 Pro Max, not 13 Plus), plus iPhone Air, built procedurally from Apple's published dimensions with each generation's notch or Dynamic Island, camera layout, port, buttons and colours. *iPhone 14 Pro (detailed)* is a full 3D model and is the default.
 - **Screenshot**: upload, drag & drop, or paste (Cmd/Ctrl+V) an image onto the selected phone. "Cover" crops to the screen's aspect ratio; "Stretch" fills it exactly. Native screenshots for that model fit perfectly. The Dynamic Island / notch overlay can be toggled off.
 - **Rotation**: drag a phone to turn it (Shift+drag rolls on Z, scroll wheel zooms), or use the X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
 - **Scene**: zoom, background colour, transparent background.
