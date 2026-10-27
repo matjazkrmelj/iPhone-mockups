@@ -21,18 +21,15 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 
 const key = new THREE.DirectionalLight(0xffffff, 1.2);
-key.position.set(-0.6, 1.0, 4);
 key.castShadow = true;
-key.shadow.mapSize.set(512, 512);
-key.shadow.radius = 20;
+key.shadow.mapSize.set(1024, 1024);
 key.shadow.blurSamples = 25;
 key.shadow.bias = -0.0005;
-Object.assign(key.shadow.camera, { left: -1.6, right: 1.6, top: 1.6, bottom: -1.6, near: 0.5, far: 10 });
+Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 10 });
 scene.add(key);
 
 // Backdrop that only shows the phone's shadow (works with transparent export too).
-const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: 0.14 }));
-shadowPlane.position.z = -0.6;
+const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial());
 shadowPlane.receiveShadow = true;
 scene.add(shadowPlane);
 
@@ -123,7 +120,7 @@ window.addEventListener('paste', (e) => {
 const axes = ['X', 'Y', 'Z'];
 function updateRotation() {
   const [x, y, z] = axes.map((a) => +$(`rot${a}`).value);
-  axes.forEach((a, i) => { $(`rot${a}Out`).textContent = `${[x, y, z][i]}°`; });
+  axes.forEach((a, i) => { $(`rot${a}Out`).textContent = `${Math.round([x, y, z][i])}°`; });
   phone.group.rotation.set(THREE.MathUtils.degToRad(x), THREE.MathUtils.degToRad(y), THREE.MathUtils.degToRad(z));
   requestRender();
 }
@@ -142,6 +139,43 @@ document.querySelectorAll('[data-preset]').forEach((btn) => {
   });
 });
 
+// Drag the phone to rotate it: horizontal = Y, vertical = X, Shift + horizontal = Z.
+const wrap = (deg) => ((((deg + 180) % 360) + 360) % 360) - 180;
+let drag = null;
+canvas.addEventListener('pointerdown', (e) => {
+  drag = { x: e.clientX, y: e.clientY };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x;
+  const dy = e.clientY - drag.y;
+  drag = { x: e.clientX, y: e.clientY };
+  const speed = 0.4;
+  const nudge = (axis, delta) => {
+    const input = $(`rot${axis}`);
+    input.value = wrap(+input.value + delta);
+  };
+  if (e.shiftKey) {
+    nudge('Z', -dx * speed);
+  } else {
+    nudge('Y', dx * speed);
+    nudge('X', dy * speed);
+  }
+  updateRotation();
+});
+const endDrag = () => { drag = null; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoom = $('zoom');
+  zoom.value = Math.min(+zoom.max, Math.max(+zoom.min, +zoom.value - Math.sign(e.deltaY) * 5));
+  zoom.dispatchEvent(new Event('input'));
+}, { passive: false });
+
 // ---------- Scene ----------
 $('zoom').addEventListener('input', (e) => {
   $('zoomOut').textContent = `${e.target.value}%`;
@@ -158,8 +192,46 @@ function updateBackground() {
 }
 $('bg').addEventListener('input', updateBackground);
 $('transparent').addEventListener('change', updateBackground);
-$('shadow').addEventListener('change', (e) => { shadowPlane.visible = e.target.checked; requestRender(); });
 updateBackground();
+
+// ---------- Light & shadow ----------
+const lightControls = {
+  lightAz: (v) => `${v}°`,
+  lightEl: (v) => `${v}°`,
+  lightInt: (v) => `${v}%`,
+  envInt: (v) => `${v}%`,
+  exposure: (v) => `${v}%`,
+  glare: (v) => `${v}%`,
+  shadowOpacity: (v) => `${v}%`,
+  shadowSoft: (v) => `${v}`,
+  shadowDist: (v) => `${v}`,
+};
+const lightDefaults = Object.fromEntries(Object.keys(lightControls).map((id) => [id, $(id).value]));
+
+function updateLight() {
+  const v = Object.fromEntries(Object.keys(lightControls).map((id) => [id, +$(id).value]));
+  for (const [id, fmt] of Object.entries(lightControls)) $(`${id}Out`).textContent = fmt(v[id]);
+  const az = THREE.MathUtils.degToRad(v.lightAz);
+  const el = THREE.MathUtils.degToRad(v.lightEl);
+  key.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(4);
+  key.intensity = v.lightInt / 100;
+  scene.environmentIntensity = v.envInt / 100;
+  renderer.toneMappingExposure = v.exposure / 100;
+  phone.reflection.material.opacity = v.glare / 100;
+  shadowPlane.material.opacity = v.shadowOpacity / 100;
+  key.shadow.radius = v.shadowSoft;
+  shadowPlane.position.z = -v.shadowDist / 100;
+  shadowPlane.visible = $('shadow').checked;
+  requestRender();
+}
+for (const id of Object.keys(lightControls)) $(id).addEventListener('input', updateLight);
+$('shadow').addEventListener('change', updateLight);
+$('resetLight').addEventListener('click', () => {
+  for (const [id, val] of Object.entries(lightDefaults)) $(id).value = val;
+  $('shadow').checked = true;
+  updateLight();
+});
+updateLight();
 
 // ---------- Camera / sizing ----------
 function updateCamera(width = stage.clientWidth, height = stage.clientHeight) {

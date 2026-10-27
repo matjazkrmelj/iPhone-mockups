@@ -31,16 +31,17 @@
         <h2>Rotation</h2>
         <div class="slider" data-axis="x">
           <label>X <output id="rotXOut">0°</output></label>
-          <input type="range" id="rotX" min="-180" max="180" step="1" value="0" />
+          <input type="range" id="rotX" min="-180" max="180" step="0.1" value="0" />
         </div>
         <div class="slider" data-axis="y">
           <label>Y <output id="rotYOut">0°</output></label>
-          <input type="range" id="rotY" min="-180" max="180" step="1" value="0" />
+          <input type="range" id="rotY" min="-180" max="180" step="0.1" value="0" />
         </div>
         <div class="slider" data-axis="z">
           <label>Z <output id="rotZOut">0°</output></label>
-          <input type="range" id="rotZ" min="-180" max="180" step="1" value="0" />
+          <input type="range" id="rotZ" min="-180" max="180" step="0.1" value="0" />
         </div>
+        <p class="hint">Tip: drag the phone to rotate it (Shift+drag for Z), scroll to zoom.</p>
         <div class="presets">
           <button data-preset="0,0,0">Front</button>
           <button data-preset="10,-25,0">Face left</button>
@@ -70,7 +71,52 @@
           <input type="color" id="bg" value="#e9ecf1" />
         </div>
         <label class="check"><input type="checkbox" id="transparent" /> Transparent background</label>
-        <label class="check"><input type="checkbox" id="shadow" checked /> Soft shadow</label>
+      </section>
+
+      <section>
+        <h2>Light</h2>
+        <div class="slider">
+          <label>Direction <output id="lightAzOut"></output></label>
+          <input type="range" id="lightAz" min="-180" max="180" step="0.1" value="-15" />
+        </div>
+        <div class="slider">
+          <label>Height <output id="lightElOut"></output></label>
+          <input type="range" id="lightEl" min="-80" max="80" step="1" value="20" />
+        </div>
+        <div class="slider">
+          <label>Key light <output id="lightIntOut"></output></label>
+          <input type="range" id="lightInt" min="0" max="300" step="1" value="120" />
+        </div>
+        <div class="slider">
+          <label>Reflections <output id="envIntOut"></output></label>
+          <input type="range" id="envInt" min="0" max="200" step="1" value="100" />
+        </div>
+        <div class="slider">
+          <label>Screen glare <output id="glareOut"></output></label>
+          <input type="range" id="glare" min="0" max="100" step="1" value="30" />
+        </div>
+        <div class="slider">
+          <label>Exposure <output id="exposureOut"></output></label>
+          <input type="range" id="exposure" min="40" max="200" step="1" value="100" />
+        </div>
+      </section>
+
+      <section>
+        <h2>Shadow</h2>
+        <label class="check"><input type="checkbox" id="shadow" checked /> Show shadow</label>
+        <div class="slider">
+          <label>Opacity <output id="shadowOpacityOut"></output></label>
+          <input type="range" id="shadowOpacity" min="0" max="80" step="1" value="18" />
+        </div>
+        <div class="slider">
+          <label>Softness <output id="shadowSoftOut"></output></label>
+          <input type="range" id="shadowSoft" min="1" max="40" step="1" value="16" />
+        </div>
+        <div class="slider">
+          <label>Distance <output id="shadowDistOut"></output></label>
+          <input type="range" id="shadowDist" min="10" max="200" step="1" value="60" />
+        </div>
+        <button id="resetLight">Reset light &amp; shadow</button>
       </section>
 
       <section>

@@ -7,10 +7,10 @@ export const PHONE = { width: 0.706, height: 1.466, depth: 0.0825, radius: 0.11 
 export const SCREEN = { width: 0.655, height: 1.42, radius: 0.088 };
 
 export const FRAME_COLORS = {
-  natural: { frame: 0xbab5ab, back: 0xc9c4ba },
-  black: { frame: 0x3d3d40, back: 0x38383b },
-  white: { frame: 0xe2e1dd, back: 0xefeeea },
-  blue: { frame: 0x3f4657, back: 0x495064 },
+  natural: { frame: 0xbab5ab, back: 0xc9c4ba, band: 0xa9a59d },
+  black: { frame: 0x3d3d40, back: 0x38383b, band: 0x2c2c2e },
+  white: { frame: 0xe2e1dd, back: 0xefeeea, band: 0xcfcdc8 },
+  blue: { frame: 0x3f4657, back: 0x495064, band: 0x343a48 },
 };
 
 function roundedRectShape(w, h, r) {
@@ -29,7 +29,7 @@ function roundedRectShape(w, h, r) {
 }
 
 // Flat rounded rect with UVs normalised to 0..1 across its bounds.
-function roundedPlane(w, h, r, segments = 24) {
+function roundedPlane(w, h, r, segments = 32) {
   const geo = new THREE.ShapeGeometry(roundedRectShape(w, h, r), segments);
   const pos = geo.attributes.position;
   const uv = geo.attributes.uv;
@@ -39,16 +39,33 @@ function roundedPlane(w, h, r, segments = 24) {
   return geo;
 }
 
-function roundedSlab(w, h, r, depth, bevel) {
-  const geo = new THREE.ExtrudeGeometry(roundedRectShape(w - bevel * 2, h - bevel * 2, r - bevel), {
-    depth: depth - bevel * 2,
+// Rounded slab centred on z = 0, with rounded (bevelled) edges.
+function roundedSlab(w, h, r, depth, bevel, segments = 10) {
+  const geo = new THREE.ExtrudeGeometry(roundedRectShape(w - bevel * 2, h - bevel * 2, Math.max(r - bevel, 0.001)), {
+    depth: Math.max(depth - bevel * 2, 0.0001),
     bevelEnabled: true,
     bevelThickness: bevel,
     bevelSize: bevel,
-    bevelSegments: 8,
-    curveSegments: 24,
+    bevelSegments: segments,
+    curveSegments: 32,
   });
   geo.translate(0, 0, -(depth / 2 - bevel));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// Lens barrel profile, revolved around the axis. Height grows along -z (out of the back).
+function lensBarrel(rInner, rOuter, height) {
+  const pts = [
+    new THREE.Vector2(rOuter, 0),
+    new THREE.Vector2(rOuter, height * 0.7),
+    new THREE.Vector2(rOuter - 0.004, height),
+    new THREE.Vector2(rInner + 0.003, height),
+    new THREE.Vector2(rInner, height - 0.003),
+    new THREE.Vector2(rInner, 0),
+  ];
+  const geo = new THREE.LatheGeometry(pts, 64);
+  geo.rotateX(-Math.PI / 2);
   return geo;
 }
 
@@ -56,77 +73,109 @@ export function createPhone() {
   const { width: W, height: H, depth: D, radius: R } = PHONE;
   const group = new THREE.Group();
 
-  const frameMat = new THREE.MeshPhysicalMaterial({ color: 0xbab5ab, metalness: 1, roughness: 0.32 });
-  const backMat = new THREE.MeshPhysicalMaterial({ color: 0xc9c4ba, metalness: 0, roughness: 0.6, clearcoat: 0.3, clearcoatRoughness: 0.6 });
-  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x050505, metalness: 0, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.03 });
-  const blackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  // ---------- Materials ----------
+  const frameMat = new THREE.MeshPhysicalMaterial({
+    color: 0xbab5ab, metalness: 1, roughness: 0.3, anisotropy: 0.6, clearcoat: 0.2, clearcoatRoughness: 0.2,
+  });
+  const backMat = new THREE.MeshPhysicalMaterial({
+    color: 0xc9c4ba, metalness: 0, roughness: 0.55, clearcoat: 0.4, clearcoatRoughness: 0.55,
+  });
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x030303, metalness: 0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, ior: 1.5,
+  });
+  const bandMat = new THREE.MeshStandardMaterial({ color: 0xa9a59d, roughness: 0.7 });
+  const holeMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+  const darkMetalMat = new THREE.MeshPhysicalMaterial({ color: 0x1c1c1e, metalness: 1, roughness: 0.25 });
+  const lensGlassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x020306, metalness: 0, roughness: 0.05, specularIntensity: 0.5,
+    iridescence: 0.5, iridescenceIOR: 1.6, iridescenceThicknessRange: [200, 500],
+  });
+  const lensInnerMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0d16, metalness: 0.3, roughness: 0.2 });
 
-  // Body: extrude caps get the glass material, sides get the metal frame.
-  const body = new THREE.Mesh(roundedSlab(W, H, R, D, 0.014), [glassMat, frameMat]);
-  group.add(body);
+  // ---------- Body ----------
+  // Titanium band with rounded edges.
+  const frame = new THREE.Mesh(roundedSlab(W, H, R, D, 0.018), frameMat);
+  group.add(frame);
 
-  // Display.
+  // Front cover glass, sitting slightly proud of the frame.
+  const glassT = 0.006;
+  const front = new THREE.Mesh(roundedSlab(W - 0.012, H - 0.012, R - 0.006, glassT, 0.0022, 4), glassMat);
+  front.position.z = D / 2 - glassT / 2 + 0.0006;
+  group.add(front);
+  const frontZ = D / 2 + 0.0006;
+
+  // Frosted back glass.
+  const back = new THREE.Mesh(roundedSlab(W - 0.012, H - 0.012, R - 0.006, glassT, 0.0022, 4), backMat);
+  back.position.z = -(D / 2 - glassT / 2 + 0.0006);
+  group.add(back);
+  const backZ = -frontZ;
+
+  // ---------- Front ----------
   const screenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
   const screen = new THREE.Mesh(roundedPlane(SCREEN.width, SCREEN.height, SCREEN.radius), screenMat);
-  screen.position.z = D / 2 + 0.0004;
+  screen.position.z = frontZ + 0.0003;
   group.add(screen);
+
+  const island = new THREE.Mesh(roundedPlane(0.125, 0.037, 0.0185), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  island.position.set(0, SCREEN.height / 2 - 0.0545, frontZ + 0.0006);
+  group.add(island);
+
+  // Earpiece slit between screen and frame.
+  const earpiece = new THREE.Mesh(roundedPlane(0.1, 0.0035, 0.00175), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
+  earpiece.position.set(0, H / 2 - 0.0095, frontZ + 0.0003);
+  group.add(earpiece);
 
   // Glass reflection layer: adds only the environment specular on top of the screen.
   const reflectMat = new THREE.MeshPhysicalMaterial({
-    color: 0x000000, metalness: 0, roughness: 0.04,
+    color: 0x000000, metalness: 0, roughness: 0.03,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   });
-  const reflection = new THREE.Mesh(roundedPlane(W - 0.03, H - 0.03, R - 0.015), reflectMat);
-  reflection.position.z = D / 2 + 0.0012;
+  const reflection = new THREE.Mesh(roundedPlane(W - 0.016, H - 0.016, R - 0.008), reflectMat);
+  reflection.position.z = frontZ + 0.001;
   group.add(reflection);
 
-  // Dynamic Island.
-  const island = new THREE.Mesh(roundedPlane(0.125, 0.037, 0.0185), blackMat);
-  island.position.set(0, SCREEN.height / 2 - 0.0545, D / 2 + 0.0008);
-  group.add(island);
-
-  // Back glass panel.
-  const back = new THREE.Mesh(roundedPlane(W - 0.03, H - 0.03, R - 0.015), backMat);
-  back.rotation.y = Math.PI;
-  back.position.z = -D / 2 - 0.0004;
-  group.add(back);
-
-  // Camera plateau (top-left when viewed from the back = +x in model space).
-  const bumpSize = 0.34;
-  const bumpDepth = 0.014;
-  const bumpX = W / 2 - 0.028 - bumpSize / 2;
-  const bumpY = H / 2 - 0.028 - bumpSize / 2;
-  const bump = new THREE.Mesh(roundedSlab(bumpSize, bumpSize, 0.085, bumpDepth, 0.005), backMat);
-  bump.position.set(bumpX, bumpY, -D / 2 - bumpDepth / 2 + 0.001);
-  group.add(bump);
-
-  const ringMat = new THREE.MeshPhysicalMaterial({ color: 0x2a2a2c, metalness: 1, roughness: 0.25 });
-  const lensMat = new THREE.MeshPhysicalMaterial({ color: 0x06070c, metalness: 0.2, roughness: 0.02, clearcoat: 1, iridescence: 0.6 });
-  const lensZ = -D / 2 - bumpDepth;
-  const lenses = [[0.075, 0.075], [0.075, -0.075], [-0.07, 0]];
-  for (const [lx, ly] of lenses) {
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.066, 0.016, 48), ringMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(bumpX + lx, bumpY + ly, lensZ - 0.006);
-    group.add(ring);
-    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.046, 48), lensMat);
-    lens.rotation.y = Math.PI;
-    lens.position.set(bumpX + lx, bumpY + ly, lensZ - 0.0142);
-    group.add(lens);
+  // ---------- Antenna bands ----------
+  const flatDepth = D - 0.036;
+  const sideBand = new THREE.BoxGeometry(0.004, 0.0035, flatDepth);
+  for (const sx of [-1, 1]) {
+    for (const y of [0.6, -0.6]) {
+      const b = new THREE.Mesh(sideBand, bandMat);
+      b.position.set(sx * (W / 2 - 0.0016), y, 0);
+      group.add(b);
+    }
   }
-  const flash = new THREE.Mesh(new THREE.CircleGeometry(0.02, 32),
-    new THREE.MeshPhysicalMaterial({ color: 0xf2ead8, roughness: 0.3 }));
-  flash.rotation.y = Math.PI;
-  flash.position.set(bumpX - 0.07, bumpY + 0.105, lensZ - 0.0005);
-  group.add(flash);
-  const lidar = new THREE.Mesh(new THREE.CircleGeometry(0.018, 32), lensMat);
-  lidar.rotation.y = Math.PI;
-  lidar.position.set(bumpX - 0.07, bumpY - 0.105, lensZ - 0.0005);
-  group.add(lidar);
+  const endBand = new THREE.BoxGeometry(0.0035, 0.004, flatDepth);
+  for (const [x, sy] of [[0.2, 1], [-0.2, 1], [0.225, -1], [-0.225, -1]]) {
+    const b = new THREE.Mesh(endBand, bandMat);
+    b.position.set(x, sy * (H / 2 - 0.0016), 0);
+    group.add(b);
+  }
 
-  // Side buttons.
+  // ---------- Bottom edge: USB-C, speaker and mic holes, screws ----------
+  const bottom = new THREE.Group();
+  bottom.rotation.x = Math.PI / 2; // shapes now face -y
+  bottom.position.y = -H / 2 - 0.0003;
+  group.add(bottom);
+  const port = new THREE.Mesh(roundedPlane(0.09, 0.03, 0.015), holeMat);
+  bottom.add(port);
+  const portInner = new THREE.Mesh(roundedPlane(0.07, 0.012, 0.006), darkMetalMat);
+  portInner.position.z = 0.0002;
+  bottom.add(portInner);
+  const holeGeo = new THREE.CircleGeometry(0.0055, 20);
+  for (const sx of [-1, 1]) {
+    for (let i = 0; i < 6; i++) {
+      const h = new THREE.Mesh(holeGeo, holeMat);
+      h.position.set(sx * (0.098 + i * 0.019), 0, 0);
+      bottom.add(h);
+    }
+    const screw = new THREE.Mesh(new THREE.CircleGeometry(0.0065, 20), darkMetalMat);
+    screw.position.set(sx * 0.068, 0, 0);
+    bottom.add(screw);
+  }
+
+  // ---------- Side buttons ----------
   const button = (x, y, len) => {
-    const b = new THREE.Mesh(new RoundedBoxGeometry(0.012, len, 0.03, 3, 0.005), frameMat);
+    const b = new THREE.Mesh(new RoundedBoxGeometry(0.014, len, 0.03, 4, 0.006), frameMat);
     b.position.set(x, y, 0);
     group.add(b);
   };
@@ -134,6 +183,40 @@ export function createPhone() {
   button(-W / 2 - 0.002, 0.31, 0.1); // volume up
   button(-W / 2 - 0.002, 0.18, 0.1); // volume down
   button(W / 2 + 0.002, 0.26, 0.16); // side button
+
+  // ---------- Camera plateau (top-left from the back = +x in model space) ----------
+  const bumpSize = 0.34;
+  const bumpDepth = 0.012;
+  const bumpX = W / 2 - 0.03 - bumpSize / 2;
+  const bumpY = H / 2 - 0.03 - bumpSize / 2;
+  const bump = new THREE.Mesh(roundedSlab(bumpSize, bumpSize, 0.088, bumpDepth, 0.005, 6), backMat);
+  bump.position.set(bumpX, bumpY, backZ - bumpDepth / 2 + 0.0005);
+  group.add(bump);
+  const bumpZ = backZ - bumpDepth + 0.0005;
+
+  const faceBack = (mesh, x, y, z) => {
+    mesh.rotation.y = Math.PI;
+    mesh.position.set(bumpX + x, bumpY + y, z);
+    group.add(mesh);
+    return mesh;
+  };
+
+  const barrelH = 0.016;
+  for (const [lx, ly] of [[0.077, 0.077], [0.077, -0.077], [-0.075, 0]]) {
+    const barrel = new THREE.Mesh(lensBarrel(0.047, 0.068, barrelH), frameMat);
+    barrel.position.set(bumpX + lx, bumpY + ly, bumpZ);
+    group.add(barrel);
+    const z = bumpZ - barrelH + 0.004;
+    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.034, 0.0475, 64), darkMetalMat), lx, ly, z);
+    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.0345, 64), lensGlassMat), lx, ly, z - 0.0002);
+    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.014, 0.019, 48), lensInnerMat), lx, ly, z - 0.0004);
+    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.008, 32), holeMat), lx, ly, z - 0.0005);
+  }
+  // Flash, LiDAR and microphone.
+  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.021, 32),
+    new THREE.MeshPhysicalMaterial({ color: 0xf3ecd9, roughness: 0.35, clearcoat: 1 })), -0.075, 0.108, bumpZ - 0.0004);
+  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.019, 32), lensGlassMat), -0.075, -0.108, bumpZ - 0.0004);
+  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.005, 16), holeMat), 0.0, 0.0, bumpZ - 0.0004);
 
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   reflection.castShadow = false;
@@ -147,6 +230,7 @@ export function createPhone() {
       const c = FRAME_COLORS[name];
       frameMat.color.setHex(c.frame);
       backMat.color.setHex(c.back);
+      bandMat.color.setHex(c.band);
     },
   };
 }
