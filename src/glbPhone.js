@@ -77,6 +77,7 @@ export async function createGlbPhone() {
     screenMat,
     island,
     reflection,
+    size: { width: M.glass.width * s, height: REAL_HEIGHT },
     screenAspect: sw / sh,
     colors: Object.fromEntries(Object.entries(COLORS).map(([k, v]) => [k, v.name])),
     setColor(name) {

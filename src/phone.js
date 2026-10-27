@@ -1,25 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
-// Approximate iPhone 15 Pro proportions (1 unit = 100 mm).
-export const PHONE = { width: 0.706, height: 1.466, depth: 0.0825, radius: 0.11 };
-// Screen matches the 1179 × 2556 screenshot aspect ratio.
-export const SCREEN = { width: 0.655, height: 1.42, radius: 0.088 };
-
-export const FRAME_COLORS = {
-  natural: { frame: 0xbab5ab, back: 0xc9c4ba, band: 0xa9a59d },
-  black: { frame: 0x3d3d40, back: 0x38383b, band: 0x2c2c2e },
-  white: { frame: 0xe2e1dd, back: 0xefeeea, band: 0xcfcdc8 },
-  blue: { frame: 0x3f4657, back: 0x495064, band: 0x343a48 },
-};
-
-const COLOR_NAMES = {
-  natural: 'Natural Titanium',
-  black: 'Black Titanium',
-  white: 'White Titanium',
-  blue: 'Blue Titanium',
-};
-
 function roundedRectShape(w, h, r) {
   const s = new THREE.Shape();
   const x = -w / 2, y = -h / 2;
@@ -76,17 +57,30 @@ function lensBarrel(rInner, rOuter, height) {
   return geo;
 }
 
-export function createPhone() {
-  const { width: W, height: H, depth: D, radius: R } = PHONE;
+const FRAME_FINISH = {
+  aluminium: { metalness: 0.9, roughness: 0.42, anisotropy: 0, clearcoat: 0.1, clearcoatRoughness: 0.4 },
+  steel: { metalness: 1, roughness: 0.12, anisotropy: 0, clearcoat: 0.5, clearcoatRoughness: 0.05 },
+  titanium: { metalness: 1, roughness: 0.3, anisotropy: 0.6, clearcoat: 0.2, clearcoatRoughness: 0.2 },
+};
+const BACK_FINISH = {
+  gloss: { roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03 },
+  matte: { roughness: 0.55, clearcoat: 0.4, clearcoatRoughness: 0.55 },
+};
+
+// Builds an iPhone procedurally from a model in models.js (1 unit = 100 mm).
+export function createPhone(spec) {
+  const mm = (v) => v / 100;
+  const [W, H, D] = spec.size.map(mm);
+  const R = W * 0.155;
+  const bezel = mm(spec.bezel);
+  const SH = H - bezel * 2;
+  const SW = SH * (spec.screen[0] / spec.screen[1]);
+  const SR = R - bezel * 0.9;
   const group = new THREE.Group();
 
   // ---------- Materials ----------
-  const frameMat = new THREE.MeshPhysicalMaterial({
-    color: 0xbab5ab, metalness: 1, roughness: 0.3, anisotropy: 0.6, clearcoat: 0.2, clearcoatRoughness: 0.2,
-  });
-  const backMat = new THREE.MeshPhysicalMaterial({
-    color: 0xc9c4ba, metalness: 0, roughness: 0.55, clearcoat: 0.4, clearcoatRoughness: 0.55,
-  });
+  const frameMat = new THREE.MeshPhysicalMaterial({ color: 0xbab5ab, ...FRAME_FINISH[spec.frame] });
+  const backMat = new THREE.MeshPhysicalMaterial({ color: 0xc9c4ba, metalness: 0, ...BACK_FINISH[spec.back] });
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: 0x030303, metalness: 0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, ior: 1.5,
   });
@@ -98,9 +92,10 @@ export function createPhone() {
     iridescence: 0.5, iridescenceIOR: 1.6, iridescenceThicknessRange: [200, 500],
   });
   const lensInnerMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0d16, metalness: 0.3, roughness: 0.2 });
+  const flashMat = new THREE.MeshPhysicalMaterial({ color: 0xf3ecd9, roughness: 0.35, clearcoat: 1 });
 
   // ---------- Body ----------
-  // Titanium band with rounded edges.
+  // Metal band with rounded edges.
   const frame = new THREE.Mesh(roundedSlab(W, H, R, D, 0.018), frameMat);
   group.add(frame);
 
@@ -111,7 +106,7 @@ export function createPhone() {
   group.add(front);
   const frontZ = D / 2 + 0.0006;
 
-  // Frosted back glass.
+  // Back glass.
   const back = new THREE.Mesh(roundedSlab(W - 0.012, H - 0.012, R - 0.006, glassT, 0.0022, 4), backMat);
   back.position.z = -(D / 2 - glassT / 2 + 0.0006);
   group.add(back);
@@ -119,17 +114,26 @@ export function createPhone() {
 
   // ---------- Front ----------
   const screenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
-  const screen = new THREE.Mesh(roundedPlane(SCREEN.width, SCREEN.height, SCREEN.radius), screenMat);
+  const screen = new THREE.Mesh(roundedPlane(SW, SH, SR), screenMat);
   screen.position.z = frontZ + 0.0003;
   group.add(screen);
 
-  const island = new THREE.Mesh(roundedPlane(0.125, 0.037, 0.0185), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-  island.position.set(0, SCREEN.height / 2 - 0.0545, frontZ + 0.0006);
+  // Dynamic Island, or the notch on iPhone 13 / 14. The notch reaches up into the black border.
+  const cutoutMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  let island;
+  if (spec.cutout === 'notch') {
+    const nw = 0.268, nh = 0.054, over = 0.02;
+    island = new THREE.Mesh(roundedPlane(nw, nh + over, 0.02), cutoutMat);
+    island.position.set(0, SH / 2 - nh + (nh + over) / 2, frontZ + 0.0006);
+  } else {
+    island = new THREE.Mesh(roundedPlane(0.125, 0.037, 0.0185), cutoutMat);
+    island.position.set(0, SH / 2 - 0.0545, frontZ + 0.0006);
+  }
   group.add(island);
 
   // Earpiece slit between screen and frame.
   const earpiece = new THREE.Mesh(roundedPlane(0.1, 0.0035, 0.00175), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
-  earpiece.position.set(0, H / 2 - 0.0095, frontZ + 0.0003);
+  earpiece.position.set(0, H / 2 - 0.0095, frontZ + 0.0007);
   group.add(earpiece);
 
   // Glass reflection layer: adds only the environment specular on top of the screen.
@@ -145,29 +149,32 @@ export function createPhone() {
   const flatDepth = D - 0.036;
   const sideBand = new THREE.BoxGeometry(0.004, 0.0035, flatDepth);
   for (const sx of [-1, 1]) {
-    for (const y of [0.6, -0.6]) {
+    for (const y of [H * 0.41, -H * 0.41]) {
       const b = new THREE.Mesh(sideBand, bandMat);
       b.position.set(sx * (W / 2 - 0.0016), y, 0);
       group.add(b);
     }
   }
   const endBand = new THREE.BoxGeometry(0.0035, 0.004, flatDepth);
-  for (const [x, sy] of [[0.2, 1], [-0.2, 1], [0.225, -1], [-0.225, -1]]) {
+  for (const [x, sy] of [[W * 0.28, 1], [-W * 0.28, 1], [W * 0.32, -1], [-W * 0.32, -1]]) {
     const b = new THREE.Mesh(endBand, bandMat);
     b.position.set(x, sy * (H / 2 - 0.0016), 0);
     group.add(b);
   }
 
-  // ---------- Bottom edge: USB-C, speaker and mic holes, screws ----------
+  // ---------- Bottom edge: charging port, speaker and mic holes, screws ----------
   const bottom = new THREE.Group();
   bottom.rotation.x = Math.PI / 2; // shapes now face -y
   bottom.position.y = -H / 2 - 0.0003;
   group.add(bottom);
-  const port = new THREE.Mesh(roundedPlane(0.09, 0.03, 0.015), holeMat);
-  bottom.add(port);
-  const portInner = new THREE.Mesh(roundedPlane(0.07, 0.012, 0.006), darkMetalMat);
-  portInner.position.z = 0.0002;
-  bottom.add(portInner);
+  if (spec.port === 'usbc') {
+    bottom.add(new THREE.Mesh(roundedPlane(0.09, 0.03, 0.015), holeMat));
+    const portInner = new THREE.Mesh(roundedPlane(0.07, 0.012, 0.006), darkMetalMat);
+    portInner.position.z = 0.0002;
+    bottom.add(portInner);
+  } else {
+    bottom.add(new THREE.Mesh(roundedPlane(0.078, 0.022, 0.011), holeMat));
+  }
   const holeGeo = new THREE.CircleGeometry(0.0055, 20);
   for (const sx of [-1, 1]) {
     for (let i = 0; i < 6; i++) {
@@ -180,50 +187,103 @@ export function createPhone() {
     bottom.add(screw);
   }
 
-  // ---------- Side buttons ----------
-  const button = (x, y, len) => {
-    const b = new THREE.Mesh(new RoundedBoxGeometry(0.014, len, 0.03, 4, 0.006), frameMat);
-    b.position.set(x, y, 0);
+  // ---------- Side buttons (positions measured from the top edge) ----------
+  const button = (x, fromTop, len, mat = frameMat, depth = 0.03, out = 0.002) => {
+    const b = new THREE.Mesh(new RoundedBoxGeometry(0.014, len, depth, 4, 0.006), mat);
+    b.position.set(x + Math.sign(x) * out, H / 2 - fromTop, 0);
     group.add(b);
   };
-  button(-W / 2 - 0.002, 0.45, 0.06); // action button
-  button(-W / 2 - 0.002, 0.31, 0.1); // volume up
-  button(-W / 2 - 0.002, 0.18, 0.1); // volume down
-  button(W / 2 + 0.002, 0.26, 0.16); // side button
+  const left = -W / 2, right = W / 2;
+  if (spec.button === 'action') button(left, 0.28, 0.06); // action button
+  else button(left, 0.28, 0.045, frameMat, 0.022, 0.003); // mute switch
+  button(left, 0.42, 0.1); // volume up
+  button(left, 0.55, 0.1); // volume down
+  button(right, 0.47, 0.16); // side button
+  if (spec.cameraControl) {
+    button(right, H * 0.66, 0.19, new THREE.MeshPhysicalMaterial({ color: 0x2a2a2c, metalness: 0.2, roughness: 0.1, clearcoat: 1 }), 0.024, -0.004);
+  }
 
-  // ---------- Camera plateau (top-left from the back = +x in model space) ----------
-  const bumpSize = 0.34;
+  // ---------- Cameras (back view: +x in model space is the left side seen from behind) ----------
   const bumpDepth = 0.012;
-  const bumpX = W / 2 - 0.03 - bumpSize / 2;
-  const bumpY = H / 2 - 0.03 - bumpSize / 2;
-  const bump = new THREE.Mesh(roundedSlab(bumpSize, bumpSize, 0.088, bumpDepth, 0.005, 6), backMat);
-  bump.position.set(bumpX, bumpY, backZ - bumpDepth / 2 + 0.0005);
-  group.add(bump);
-  const bumpZ = backZ - bumpDepth + 0.0005;
-
   const faceBack = (mesh, x, y, z) => {
     mesh.rotation.y = Math.PI;
-    mesh.position.set(bumpX + x, bumpY + y, z);
+    mesh.position.set(x, y, z);
     group.add(mesh);
     return mesh;
   };
-
-  const barrelH = 0.016;
-  for (const [lx, ly] of [[0.077, 0.077], [0.077, -0.077], [-0.075, 0]]) {
-    const barrel = new THREE.Mesh(lensBarrel(0.047, 0.068, barrelH), frameMat);
-    barrel.position.set(bumpX + lx, bumpY + ly, bumpZ);
+  const addBump = (w, h, r, cx, cy, mat = backMat) => {
+    const bump = new THREE.Mesh(roundedSlab(w, h, r, bumpDepth, 0.005, 6), mat);
+    bump.position.set(cx, cy, backZ - bumpDepth / 2 + 0.0005);
+    group.add(bump);
+    return backZ - bumpDepth + 0.0005;
+  };
+  const lens = (x, y, z, rOuter) => {
+    const k = rOuter / 0.068;
+    const barrelH = 0.016;
+    const barrel = new THREE.Mesh(lensBarrel(0.047 * k, rOuter, barrelH), frameMat);
+    barrel.position.set(x, y, z);
     group.add(barrel);
-    const z = bumpZ - barrelH + 0.004;
-    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.034, 0.0475, 64), darkMetalMat), lx, ly, z);
-    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.0345, 64), lensGlassMat), lx, ly, z - 0.0002);
-    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.014, 0.019, 48), lensInnerMat), lx, ly, z - 0.0004);
-    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.008, 32), holeMat), lx, ly, z - 0.0005);
+    const lz = z - barrelH + 0.004;
+    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.034 * k, 0.0475 * k, 64), darkMetalMat), x, y, lz);
+    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.0345 * k, 64), lensGlassMat), x, y, lz - 0.0002);
+    faceBack(new THREE.Mesh(new THREE.RingGeometry(0.014 * k, 0.019 * k, 48), lensInnerMat), x, y, lz - 0.0004);
+    faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.008 * k, 32), holeMat), x, y, lz - 0.0005);
+  };
+  const flash = (x, y, z, r = 0.021) => faceBack(new THREE.Mesh(new THREE.CircleGeometry(r, 32), flashMat), x, y, z - 0.0004);
+  const lidar = (x, y, z) => faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.019, 32), lensGlassMat), x, y, z - 0.0004);
+  const mic = (x, y, z) => faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.005, 16), holeMat), x, y, z - 0.0004);
+
+  // Pro triangle of three lenses with flash and LiDAR, in a square of side s centred on (cx, cy).
+  const triple = (cx, cy, s, z) => {
+    const k = s * 0.227;
+    for (const [lx, ly] of [[k, k], [k, -k], [-k, 0]]) lens(cx + lx, cy + ly, z, s * 0.2);
+    flash(cx - k, cy + s * 0.318, z);
+    lidar(cx - k, cy - s * 0.318, z);
+    mic(cx, cy, z);
+  };
+
+  const inset = 0.03;
+  if (spec.camera === 'triple') {
+    const s = W * 0.48;
+    const cx = W / 2 - inset - s / 2, cy = H / 2 - inset - s / 2;
+    triple(cx, cy, s, addBump(s, s, s * 0.26, cx, cy));
+  } else if (spec.camera === 'diagonal' || spec.camera === 'vertical') {
+    const s = W * 0.42;
+    const cx = W / 2 - inset - s / 2, cy = H / 2 - inset - s / 2;
+    const z = addBump(s, s, s * 0.27, cx, cy);
+    const k = s * 0.24;
+    if (spec.camera === 'diagonal') {
+      lens(cx + k, cy + k, z, s * 0.21);
+      lens(cx - k, cy - k, z, s * 0.21);
+      flash(cx - k, cy + k, z, 0.018);
+      mic(cx + k * 0.1, cy - k * 0.1, z);
+    } else {
+      lens(cx + k, cy + k, z, s * 0.21);
+      lens(cx + k, cy - k, z, s * 0.21);
+      flash(cx - k, cy + k, z, 0.018);
+      mic(cx - k, cy - k, z);
+    }
+  } else if (spec.camera === 'pill') {
+    const pw = W * 0.21, ph = W * 0.45;
+    const cx = W / 2 - inset - pw / 2, cy = H / 2 - inset - ph / 2;
+    const z = addBump(pw, ph, pw / 2, cx, cy);
+    lens(cx, cy + ph / 2 - pw / 2, z, pw * 0.4);
+    lens(cx, cy - ph / 2 + pw / 2, z, pw * 0.4);
+    flash(cx - pw / 2 - 0.05, cy + ph / 2 - pw / 2, backZ - 0.0002, 0.018);
+    mic(cx - pw / 2 - 0.05, cy, backZ - 0.0002);
+  } else if (spec.camera === 'plateau') {
+    // iPhone 17 Pro: a full-width aluminium plateau with the lenses on the left and flash and LiDAR on the right.
+    const ph = H * 0.3;
+    const cy = H / 2 - 0.004 - ph / 2;
+    const z = addBump(W - 0.008, ph, R - 0.004, 0, cy, frameMat);
+    const s = W * 0.46;
+    const k = s * 0.227;
+    const cx = W / 2 - 0.02 - s / 2;
+    for (const [lx, ly] of [[k, k], [k, -k], [-k, 0]]) lens(cx + lx, cy + ly, z, s * 0.2);
+    flash(-W / 2 + 0.09, cy + k * 0.8, z);
+    lidar(-W / 2 + 0.09, cy - k * 0.8, z);
+    mic(-W / 2 + 0.09, cy, z);
   }
-  // Flash, LiDAR and microphone.
-  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.021, 32),
-    new THREE.MeshPhysicalMaterial({ color: 0xf3ecd9, roughness: 0.35, clearcoat: 1 })), -0.075, 0.108, bumpZ - 0.0004);
-  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.019, 32), lensGlassMat), -0.075, -0.108, bumpZ - 0.0004);
-  faceBack(new THREE.Mesh(new THREE.CircleGeometry(0.005, 16), holeMat), 0.0, 0.0, bumpZ - 0.0004);
 
   group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   reflection.castShadow = false;
@@ -233,13 +293,14 @@ export function createPhone() {
     screenMat,
     island,
     reflection,
-    screenAspect: SCREEN.width / SCREEN.height,
-    colors: COLOR_NAMES,
+    size: { width: W, height: H },
+    screenAspect: SW / SH,
+    colors: Object.fromEntries(Object.entries(spec.colors).map(([k, v]) => [k, v[0]])),
     setColor(name) {
-      const c = FRAME_COLORS[name];
-      frameMat.color.setHex(c.frame);
-      backMat.color.setHex(c.back);
-      bandMat.color.setHex(c.band);
+      const [, frameHex, backHex] = spec.colors[name];
+      frameMat.color.setHex(frameHex);
+      backMat.color.setHex(backHex);
+      bandMat.color.setHex(frameHex).multiplyScalar(0.85);
     },
   };
 }
