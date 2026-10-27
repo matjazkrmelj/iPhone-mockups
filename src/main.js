@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { createPhone, placeholderCanvas, PHONE, SCREEN } from './phone.js';
+import { createPhone, placeholderCanvas, PHONE } from './phone.js';
+import { createGlbPhone } from './glbPhone.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -44,7 +45,7 @@ function requestRender() {
   });
 }
 
-const phone = createPhone();
+let phone = createPhone();
 scene.add(phone.group);
 
 // ---------- Screen texture ----------
@@ -68,7 +69,7 @@ function applyFit() {
   t.offset.set(0, 0);
   if ($('fit').value === 'cover') {
     const imgAspect = img.width / img.height;
-    const screenAspect = SCREEN.width / SCREEN.height;
+    const screenAspect = phone.screenAspect;
     if (imgAspect > screenAspect) {
       t.repeat.x = screenAspect / imgAspect;
       t.offset.x = (1 - t.repeat.x) / 2;
@@ -182,6 +183,41 @@ $('zoom').addEventListener('input', (e) => {
   updateCamera();
 });
 $('frame').addEventListener('change', (e) => { phone.setColor(e.target.value); requestRender(); });
+
+// ---------- Model ----------
+function fillColorOptions() {
+  $('frame').innerHTML = Object.entries(phone.colors)
+    .map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+}
+
+let modelRequest = 0;
+async function setModel(kind) {
+  const request = ++modelRequest;
+  $('model').disabled = true;
+  try {
+    const next = kind === 'detailed' ? await createGlbPhone() : createPhone();
+    if (request !== modelRequest) return;
+    scene.remove(phone.group);
+    next.group.rotation.copy(phone.group.rotation);
+    phone = next;
+    scene.add(phone.group);
+    fillColorOptions();
+    phone.setColor($('frame').value);
+    phone.island.visible = $('island').checked;
+    if (screenTexture) {
+      phone.screenMat.map = screenTexture;
+      phone.screenMat.needsUpdate = true;
+      applyFit();
+    }
+    updateLight();
+  } catch (err) {
+    console.error(err);
+    alert('Could not load the 3D model.');
+  } finally {
+    $('model').disabled = false;
+  }
+}
+$('model').addEventListener('change', (e) => setModel(e.target.value));
 
 function updateBackground() {
   const transparent = $('transparent').checked;
@@ -335,5 +371,7 @@ $('export').addEventListener('click', () => {
   resize();
 });
 
+setModel($('model').value);
+
 // Expose for debugging / automated tests.
-window.__mockup = { renderer, scene, camera, phone, loadFile };
+window.__mockup = { renderer, scene, camera, get phone() { return phone; }, loadFile };

@@ -62,7 +62,14 @@
           <input type="range" id="camTilt" min="0" max="60" step="1" value="0" />
         </div>
         <div class="row">
-          <label for="frame">Frame</label>
+          <label for="model">Model</label>
+          <select id="model">
+            <option value="detailed" selected>iPhone 14 Pro (detailed)</option>
+            <option value="simple">Simple (iPhone 15 Pro style)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="frame">Colour</label>
           <select id="frame">
             <option value="natural">Natural Titanium</option>
             <option value="black">Black Titanium</option>
@@ -146,6 +153,12 @@
         <button id="export" class="primary">Export PNG</button>
         <p class="hint" id="exportInfo"></p>
       </section>
+
+      <p class="hint credit">
+        Detailed model: <a href="https://sketchfab.com/3d-models/iphone-14-pro-5cb0778041a34f09b409a38c687bb1d4" target="_blank" rel="noopener">“iPhone 14 Pro”</a>
+        by <a href="https://sketchfab.com/misterdude" target="_blank" rel="noopener">mister dude</a>,
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+      </p>
     </aside>
 
     <main id="stage">

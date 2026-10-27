@@ -13,6 +13,13 @@ export const FRAME_COLORS = {
   blue: { frame: 0x3f4657, back: 0x495064, band: 0x343a48 },
 };
 
+const COLOR_NAMES = {
+  natural: 'Natural Titanium',
+  black: 'Black Titanium',
+  white: 'White Titanium',
+  blue: 'Blue Titanium',
+};
+
 function roundedRectShape(w, h, r) {
   const s = new THREE.Shape();
   const x = -w / 2, y = -h / 2;
@@ -29,7 +36,7 @@ function roundedRectShape(w, h, r) {
 }
 
 // Flat rounded rect with UVs normalised to 0..1 across its bounds.
-function roundedPlane(w, h, r, segments = 32) {
+export function roundedPlane(w, h, r, segments = 32) {
   const geo = new THREE.ShapeGeometry(roundedRectShape(w, h, r), segments);
   const pos = geo.attributes.position;
   const uv = geo.attributes.uv;
@@ -226,6 +233,8 @@ export function createPhone() {
     screenMat,
     island,
     reflection,
+    screenAspect: SCREEN.width / SCREEN.height,
+    colors: COLOR_NAMES,
     setColor(name) {
       const c = FRAME_COLORS[name];
       frameMat.color.setHex(c.frame);
