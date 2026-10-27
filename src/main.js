@@ -250,11 +250,13 @@ function updateLight() {
     .addScaledVector(forward, Math.cos(az) * Math.cos(el))
     .addScaledVector(normal, Math.sin(el))
     .multiplyScalar(8);
-  key.intensity = v.lightInt / 100;
+  // 100% key light = 3.0 intensity, strong enough to dominate the environment light.
+  key.intensity = (v.lightInt / 100) * 3;
   scene.environmentIntensity = v.envInt / 100;
   renderer.toneMappingExposure = v.exposure / 100;
   phone.reflection.material.opacity = v.glare / 100;
-  shadowPlane.material.opacity = v.shadowOpacity / 100;
+  // Shadows come from the key light, so they fade out as it is dimmed.
+  shadowPlane.material.opacity = (v.shadowOpacity / 100) * Math.min(1, v.lightInt / 100);
   key.shadow.radius = v.shadowSoft;
   shadowPlane.visible = $('shadow').checked;
   updateSurface();
