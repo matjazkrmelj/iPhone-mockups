@@ -2,7 +2,7 @@
 
 ![Example export](docs/example-export.png)
 
-A local web app that renders a 3D iPhone (iPhone 15 Pro proportions) with your own screenshot on the display, lets you rotate it on the X/Y/Z axes, and exports the view as a PNG.
+A local web app that renders 3D iPhones (iPhone 13 to iPhone 17, in every size) with your own screenshots on the display, lets you rotate them on the X/Y/Z axes, and exports the view as a PNG.
 
 ## Run it
 
@@ -21,15 +21,16 @@ To build a static version: `npm run build` (output in `dist/`, serve with `npm r
 
 ## Features
 
-- **Screenshot**: upload, drag & drop, or paste (Cmd/Ctrl+V) an image. "Cover" crops to the screen's aspect ratio; "Stretch" fills it exactly. Native iPhone screenshots (e.g. 1179 × 2556) fit perfectly. The Dynamic Island overlay can be toggled off.
-- **Rotation**: drag the phone to turn it (Shift+drag rolls on Z, scroll wheel zooms), or use the X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
-- **Model**: choose the detailed *iPhone 14 Pro* (default; Space Black, Silver, Gold, Deep Purple) or the *Simple* procedural iPhone 15 Pro-style model (Natural / Black / White / Blue Titanium).
+- **Phones**: up to three phones in one scene, each with its own model, colour, screenshot, rotation and position. Click a phone (or its tab) to select it; the sidebar edits the selected phone. *Spacing* sets the gap between them.
+- **Models**: iPhone 13, 14, 15, 16 and 17 in the regular, Plus, Pro and Pro Max sizes (13 Pro Max, not 13 Plus), built procedurally from Apple's published dimensions with each generation's notch or Dynamic Island, camera layout, port, buttons and colours. *iPhone 14 Pro (detailed)* is a full 3D model and is the default.
+- **Screenshot**: upload, drag & drop, or paste (Cmd/Ctrl+V) an image onto the selected phone. "Cover" crops to the screen's aspect ratio; "Stretch" fills it exactly. Native screenshots for that model fit perfectly. The Dynamic Island / notch overlay can be toggled off.
+- **Rotation**: drag a phone to turn it (Shift+drag rolls on Z, scroll wheel zooms), or use the X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
 - **Scene**: zoom, background colour, transparent background.
-- **Surface**: choose whether the phone is *Standing* on a floor or *Lying flat* on a table. The shadow is cast onto that surface, which always touches the phone's lowest point whatever its rotation.
+- **Surface**: choose whether the phones are *Standing* on a floor or *Lying flat* on a table. Shadows are cast onto that surface, which always touches the phones' lowest point whatever their rotation.
 - **Light**: key light direction and elevation (measured from the surface), strength, environment reflections, screen glare and exposure.
 - **Shadow**: on/off, opacity, softness, and the gap between the phone and the surface.
 - **Camera height**: look down at the scene (defaults to 20° when standing, 0° when lying flat).
-- **Export**: PNG at 1×–4× the viewport size. With "Transparent background" on, the PNG has an alpha channel.
+- **Export**: choose a format (fit the window, Square 1:1, Portrait 4:5, Story 9:16, Landscape 16:9, App Store 6.9″ at 1290 × 2796, or a custom size). Fixed formats show a frame of that shape, so the preview matches the PNG. Size multiplies the format by 1×–4×. With "Transparent background" on, the PNG has an alpha channel.
 
 ## Credits
 
@@ -37,6 +38,7 @@ The detailed model is ["iPhone 14 Pro"](https://sketchfab.com/3d-models/iphone-1
 
 ## Files
 
-- `src/phone.js` builds the iPhone model procedurally with Three.js (no external model files): rounded titanium frame, raised cover glass, antenna bands, USB-C port, speaker grilles, side buttons and a detailed camera plateau.
+- `src/models.js` lists the iPhone models: dimensions, screen resolution, design features and colours.
+- `src/phone.js` builds an iPhone procedurally with Three.js from one of those models: rounded frame, raised cover glass, notch or Dynamic Island, antenna bands, port, speaker grilles, side buttons and the camera layout.
 - `src/glbPhone.js` loads the detailed model (`public/models/iphone-14-pro.glb`) and overlays the screenshot on its screen.
 - `src/main.js` handles the scene, sidebar controls, and export.

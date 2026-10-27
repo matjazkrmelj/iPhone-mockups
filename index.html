@@ -11,7 +11,39 @@
       <h1>iPhone Mockup</h1>
 
       <section>
-        <h2>Screenshot</h2>
+        <h2>Phones</h2>
+        <div class="phone-tabs multi-only" id="phoneTabs"></div>
+        <div class="button-row">
+          <button id="addPhone">Add phone</button>
+          <button id="removePhone" class="multi-only">Remove</button>
+        </div>
+        <div class="row">
+          <label for="model">Model</label>
+          <select id="model"></select>
+        </div>
+        <div class="row">
+          <label for="frame">Colour</label>
+          <select id="frame"></select>
+        </div>
+        <div class="multi-only">
+          <div class="slider">
+            <label>Left / right <output id="offXOut">0 mm</output></label>
+            <input type="range" id="offX" min="-300" max="300" step="1" value="0" />
+          </div>
+          <div class="slider">
+            <label>Forward / back <output id="offFOut">0 mm</output></label>
+            <input type="range" id="offF" min="-300" max="300" step="1" value="0" />
+          </div>
+          <div class="slider">
+            <label>Spacing (all phones) <output id="spacingOut">25%</output></label>
+            <input type="range" id="spacing" min="0" max="150" step="1" value="25" />
+          </div>
+          <p class="hint">Click a phone in the scene to select it. Screenshot, rotation, colour and position apply to the selected phone.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Screenshot<span class="phone-name"></span></h2>
         <label class="file-btn">
           <input type="file" id="file" accept="image/*" />
           Upload screenshot
@@ -24,11 +56,11 @@
             <option value="stretch">Stretch</option>
           </select>
         </div>
-        <label class="check"><input type="checkbox" id="island" checked /> Show Dynamic Island</label>
+        <label class="check"><input type="checkbox" id="island" checked /> Show Dynamic Island / notch</label>
       </section>
 
       <section>
-        <h2>Rotation</h2>
+        <h2>Rotation<span class="phone-name"></span></h2>
         <div class="slider" data-axis="x">
           <label>X <output id="rotXOut">0°</output></label>
           <input type="range" id="rotX" min="-180" max="180" step="0.1" value="0" />
@@ -60,22 +92,6 @@
         <div class="slider">
           <label>Camera height <output id="camTiltOut">0°</output></label>
           <input type="range" id="camTilt" min="0" max="60" step="1" value="0" />
-        </div>
-        <div class="row">
-          <label for="model">Model</label>
-          <select id="model">
-            <option value="detailed" selected>iPhone 14 Pro (detailed)</option>
-            <option value="simple">Simple (iPhone 15 Pro style)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label for="frame">Colour</label>
-          <select id="frame">
-            <option value="natural">Natural Titanium</option>
-            <option value="black">Black Titanium</option>
-            <option value="white">White Titanium</option>
-            <option value="blue">Blue Titanium</option>
-          </select>
         </div>
         <div class="row">
           <label for="bg">Background</label>
@@ -142,9 +158,27 @@
       <section>
         <h2>Export</h2>
         <div class="row">
+          <label for="format">Format</label>
+          <select id="format">
+            <option value="viewport">Fit window</option>
+            <option value="1080x1080">Square 1:1</option>
+            <option value="1080x1350">Portrait 4:5</option>
+            <option value="1080x1920">Story 9:16</option>
+            <option value="1920x1080">Landscape 16:9</option>
+            <option value="1290x2796">App Store 6.9″</option>
+            <option value="custom">Custom size</option>
+          </select>
+        </div>
+        <div class="row custom-size" id="customRow" hidden>
+          <input type="number" id="customW" min="16" max="8192" value="1600" aria-label="Width" />
+          <span>×</span>
+          <input type="number" id="customH" min="16" max="8192" value="1200" aria-label="Height" />
+          <span>px</span>
+        </div>
+        <div class="row">
           <label for="scale">Size</label>
           <select id="scale">
-            <option value="1">1× (viewport)</option>
+            <option value="1">1×</option>
             <option value="2" selected>2×</option>
             <option value="3">3×</option>
             <option value="4">4×</option>
@@ -162,7 +196,7 @@
     </aside>
 
     <main id="stage">
-      <canvas id="canvas"></canvas>
+      <div id="frame-box"><canvas id="canvas"></canvas></div>
       <div id="drop">Drop screenshot</div>
     </main>
 
