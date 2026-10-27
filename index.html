@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iPhone Mockup Generator</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <aside id="sidebar">
+      <h1>iPhone Mockup</h1>
+
+      <section>
+        <h2>Screenshot</h2>
+        <label class="file-btn">
+          <input type="file" id="file" accept="image/*" />
+          Upload screenshot
+        </label>
+        <p class="hint">Or drag &amp; drop / paste an image anywhere.</p>
+        <div class="row">
+          <label for="fit">Fit</label>
+          <select id="fit">
+            <option value="cover">Cover (crop)</option>
+            <option value="stretch">Stretch</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" id="island" checked /> Show Dynamic Island</label>
+      </section>
+
+      <section>
+        <h2>Rotation</h2>
+        <div class="slider" data-axis="x">
+          <label>X <output id="rotXOut">0°</output></label>
+          <input type="range" id="rotX" min="-180" max="180" step="1" value="0" />
+        </div>
+        <div class="slider" data-axis="y">
+          <label>Y <output id="rotYOut">0°</output></label>
+          <input type="range" id="rotY" min="-180" max="180" step="1" value="0" />
+        </div>
+        <div class="slider" data-axis="z">
+          <label>Z <output id="rotZOut">0°</output></label>
+          <input type="range" id="rotZ" min="-180" max="180" step="1" value="0" />
+        </div>
+        <div class="presets">
+          <button data-preset="0,0,0">Front</button>
+          <button data-preset="10,-25,0">Face left</button>
+          <button data-preset="10,25,0">Face right</button>
+          <button data-preset="-35,20,25">Flat</button>
+          <button data-preset="0,180,0">Back</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Scene</h2>
+        <div class="slider">
+          <label>Zoom <output id="zoomOut">100%</output></label>
+          <input type="range" id="zoom" min="50" max="200" step="1" value="100" />
+        </div>
+        <div class="row">
+          <label for="frame">Frame</label>
+          <select id="frame">
+            <option value="natural">Natural Titanium</option>
+            <option value="black">Black Titanium</option>
+            <option value="white">White Titanium</option>
+            <option value="blue">Blue Titanium</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="bg">Background</label>
+          <input type="color" id="bg" value="#e9ecf1" />
+        </div>
+        <label class="check"><input type="checkbox" id="transparent" /> Transparent background</label>
+        <label class="check"><input type="checkbox" id="shadow" checked /> Soft shadow</label>
+      </section>
+
+      <section>
+        <h2>Export</h2>
+        <div class="row">
+          <label for="scale">Size</label>
+          <select id="scale">
+            <option value="1">1× (viewport)</option>
+            <option value="2" selected>2×</option>
+            <option value="3">3×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+        <button id="export" class="primary">Export PNG</button>
+        <p class="hint" id="exportInfo"></p>
+      </section>
+    </aside>
+
+    <main id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="drop">Drop screenshot</div>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

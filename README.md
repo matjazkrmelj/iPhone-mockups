@@ -1,0 +1,30 @@
+# iPhone Mockup Generator
+
+![Example export](docs/example-export.png)
+
+A local web app that renders a 3D iPhone (iPhone 15 Pro proportions) with your own screenshot on the display, lets you rotate it on the X/Y/Z axes, and exports the view as a PNG.
+
+## Run it
+
+Requires Node.js 18+.
+
+```bash
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173.
+
+To build a static version: `npm run build` (output in `dist/`, serve with `npm run preview`).
+
+## Features
+
+- **Screenshot**: upload, drag & drop, or paste (Cmd/Ctrl+V) an image. "Cover" crops to the screen's aspect ratio; "Stretch" fills it exactly. Native iPhone screenshots (e.g. 1179 × 2556) fit perfectly. The Dynamic Island overlay can be toggled off.
+- **Rotation**: X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
+- **Scene**: zoom, frame colour (Natural / Black / White / Blue Titanium), background colour, transparent background, soft drop shadow.
+- **Export**: PNG at 1×–4× the viewport size. With "Transparent background" on, the PNG has an alpha channel.
+
+## Files
+
+- `src/phone.js` builds the iPhone model procedurally with Three.js (no external model files).
+- `src/main.js` handles the scene, sidebar controls, and export.
