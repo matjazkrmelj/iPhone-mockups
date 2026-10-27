@@ -24,8 +24,10 @@ To build a static version: `npm run build` (output in `dist/`, serve with `npm r
 - **Screenshot**: upload, drag & drop, or paste (Cmd/Ctrl+V) an image. "Cover" crops to the screen's aspect ratio; "Stretch" fills it exactly. Native iPhone screenshots (e.g. 1179 × 2556) fit perfectly. The Dynamic Island overlay can be toggled off.
 - **Rotation**: drag the phone to turn it (Shift+drag rolls on Z, scroll wheel zooms), or use the X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
 - **Scene**: zoom, frame colour (Natural / Black / White / Blue Titanium), background colour, transparent background.
-- **Light**: key light direction, height and strength, environment reflections, screen glare and exposure.
-- **Shadow**: on/off, opacity, softness and distance to the backdrop.
+- **Surface**: choose whether the phone is *Standing* on a floor or *Lying flat* on a table. The shadow is cast onto that surface, which always touches the phone's lowest point whatever its rotation.
+- **Light**: key light direction and elevation (measured from the surface), strength, environment reflections, screen glare and exposure.
+- **Shadow**: on/off, opacity, softness, and the gap between the phone and the surface.
+- **Camera height**: look down at the scene (defaults to 20° when standing, 0° when lying flat).
 - **Export**: PNG at 1×–4× the viewport size. With "Transparent background" on, the PNG has an alpha channel.
 
 ## Files

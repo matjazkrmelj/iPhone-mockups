@@ -57,6 +57,10 @@
           <label>Zoom <output id="zoomOut">100%</output></label>
           <input type="range" id="zoom" min="50" max="200" step="1" value="100" />
         </div>
+        <div class="slider">
+          <label>Camera height <output id="camTiltOut">0°</output></label>
+          <input type="range" id="camTilt" min="0" max="60" step="1" value="0" />
+        </div>
         <div class="row">
           <label for="frame">Frame</label>
           <select id="frame">
@@ -74,14 +78,23 @@
       </section>
 
       <section>
+        <h2>Surface</h2>
+        <div class="segmented">
+          <label><input type="radio" name="surface" value="standing" /> Standing</label>
+          <label><input type="radio" name="surface" value="flat" checked /> Lying flat</label>
+        </div>
+        <p class="hint">The shadow is cast onto the floor (standing) or the table (lying flat). Light angles are measured from that surface.</p>
+      </section>
+
+      <section>
         <h2>Light</h2>
         <div class="slider">
           <label>Direction <output id="lightAzOut"></output></label>
-          <input type="range" id="lightAz" min="-180" max="180" step="0.1" value="-15" />
+          <input type="range" id="lightAz" min="-180" max="180" step="0.1" value="-35" />
         </div>
         <div class="slider">
-          <label>Height <output id="lightElOut"></output></label>
-          <input type="range" id="lightEl" min="-80" max="80" step="1" value="20" />
+          <label>Elevation <output id="lightElOut"></output></label>
+          <input type="range" id="lightEl" min="5" max="90" step="1" value="45" />
         </div>
         <div class="slider">
           <label>Key light <output id="lightIntOut"></output></label>
@@ -113,8 +126,8 @@
           <input type="range" id="shadowSoft" min="1" max="40" step="1" value="16" />
         </div>
         <div class="slider">
-          <label>Distance <output id="shadowDistOut"></output></label>
-          <input type="range" id="shadowDist" min="10" max="200" step="1" value="60" />
+          <label>Gap to surface <output id="shadowDistOut"></output></label>
+          <input type="range" id="shadowDist" min="0" max="100" step="1" value="0" />
         </div>
         <button id="resetLight">Reset light &amp; shadow</button>
       </section>

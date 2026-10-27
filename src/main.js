@@ -22,14 +22,14 @@ const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 
 const key = new THREE.DirectionalLight(0xffffff, 1.2);
 key.castShadow = true;
-key.shadow.mapSize.set(1024, 1024);
+key.shadow.mapSize.set(2048, 2048);
 key.shadow.blurSamples = 25;
 key.shadow.bias = -0.0005;
-Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 10 });
+Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 20 });
 scene.add(key);
 
-// Backdrop that only shows the phone's shadow (works with transparent export too).
-const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial());
+// Surface the phone stands or lies on. It only shows the phone's shadow, so it works with transparent export too.
+const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.ShadowMaterial());
 shadowPlane.receiveShadow = true;
 scene.add(shadowPlane);
 
@@ -122,7 +122,7 @@ function updateRotation() {
   const [x, y, z] = axes.map((a) => +$(`rot${a}`).value);
   axes.forEach((a, i) => { $(`rot${a}Out`).textContent = `${Math.round([x, y, z][i])}°`; });
   phone.group.rotation.set(THREE.MathUtils.degToRad(x), THREE.MathUtils.degToRad(y), THREE.MathUtils.degToRad(z));
-  requestRender();
+  updateSurface();
 }
 for (const a of axes) {
   const input = $(`rot${a}`);
@@ -194,7 +194,22 @@ $('bg').addEventListener('input', updateBackground);
 $('transparent').addEventListener('change', updateBackground);
 updateBackground();
 
-// ---------- Light & shadow ----------
+// ---------- Surface, light & shadow ----------
+// Standing: the phone rests on a floor and the camera looks slightly down at it.
+// Lying flat: the phone lies on a table and the camera looks down onto the table.
+// Light direction and elevation are measured relative to that surface.
+const MODES = {
+  standing: {
+    normal: new THREE.Vector3(0, 1, 0), side: new THREE.Vector3(1, 0, 0), forward: new THREE.Vector3(0, 0, 1),
+    defaults: { lightAz: -40, lightEl: 40, camTilt: 20 },
+  },
+  flat: {
+    normal: new THREE.Vector3(0, 0, 1), side: new THREE.Vector3(1, 0, 0), forward: new THREE.Vector3(0, 1, 0),
+    defaults: { lightAz: -35, lightEl: 45, camTilt: 0 },
+  },
+};
+const mode = () => document.querySelector('input[name="surface"]:checked').value;
+
 const lightControls = {
   lightAz: (v) => `${v}°`,
   lightEl: (v) => `${v}°`,
@@ -204,34 +219,62 @@ const lightControls = {
   glare: (v) => `${v}%`,
   shadowOpacity: (v) => `${v}%`,
   shadowSoft: (v) => `${v}`,
-  shadowDist: (v) => `${v}`,
+  shadowDist: (v) => `${v} mm`,
 };
 const lightDefaults = Object.fromEntries(Object.keys(lightControls).map((id) => [id, $(id).value]));
+
+// Keep the surface touching the phone's lowest point (plus the gap) whatever its rotation.
+const box = new THREE.Box3();
+function updateSurface() {
+  phone.group.updateMatrixWorld(true);
+  box.setFromObject(phone.group, true);
+  const gap = +$('shadowDist').value / 100;
+  if (mode() === 'standing') {
+    shadowPlane.rotation.set(-Math.PI / 2, 0, 0);
+    shadowPlane.position.set(0, box.min.y - gap, 0);
+  } else {
+    shadowPlane.rotation.set(0, 0, 0);
+    shadowPlane.position.set(0, 0, box.min.z - gap);
+  }
+  requestRender();
+}
 
 function updateLight() {
   const v = Object.fromEntries(Object.keys(lightControls).map((id) => [id, +$(id).value]));
   for (const [id, fmt] of Object.entries(lightControls)) $(`${id}Out`).textContent = fmt(v[id]);
+  const { normal, side, forward } = MODES[mode()];
   const az = THREE.MathUtils.degToRad(v.lightAz);
   const el = THREE.MathUtils.degToRad(v.lightEl);
-  key.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(4);
+  key.position.set(0, 0, 0)
+    .addScaledVector(side, Math.sin(az) * Math.cos(el))
+    .addScaledVector(forward, Math.cos(az) * Math.cos(el))
+    .addScaledVector(normal, Math.sin(el))
+    .multiplyScalar(8);
   key.intensity = v.lightInt / 100;
   scene.environmentIntensity = v.envInt / 100;
   renderer.toneMappingExposure = v.exposure / 100;
   phone.reflection.material.opacity = v.glare / 100;
   shadowPlane.material.opacity = v.shadowOpacity / 100;
   key.shadow.radius = v.shadowSoft;
-  shadowPlane.position.z = -v.shadowDist / 100;
   shadowPlane.visible = $('shadow').checked;
-  requestRender();
+  updateSurface();
 }
 for (const id of Object.keys(lightControls)) $(id).addEventListener('input', updateLight);
 $('shadow').addEventListener('change', updateLight);
+
+function applyModeDefaults() {
+  for (const [id, val] of Object.entries(MODES[mode()].defaults)) $(id).value = val;
+  updateLight();
+  updateCamera();
+}
+document.querySelectorAll('input[name="surface"]').forEach((r) => r.addEventListener('change', applyModeDefaults));
 $('resetLight').addEventListener('click', () => {
   for (const [id, val] of Object.entries(lightDefaults)) $(id).value = val;
   $('shadow').checked = true;
-  updateLight();
+  applyModeDefaults();
 });
-updateLight();
+$('camTilt').addEventListener('input', () => updateCamera());
+applyModeDefaults();
 
 // ---------- Camera / sizing ----------
 function updateCamera(width = stage.clientWidth, height = stage.clientHeight) {
@@ -242,7 +285,9 @@ function updateCamera(width = stage.clientWidth, height = stage.clientHeight) {
   const fitH = (PHONE.height * margin) / 2 / Math.tan(halfFov);
   const fitW = (PHONE.height * 0.75 * margin) / 2 / Math.tan(halfFov) / camera.aspect;
   const dist = Math.max(fitH, fitW) / (+$('zoom').value / 100);
-  camera.position.set(0, 0, dist);
+  const tilt = THREE.MathUtils.degToRad(+$('camTilt').value);
+  $('camTiltOut').textContent = `${$('camTilt').value}°`;
+  camera.position.set(0, Math.sin(tilt) * dist, Math.cos(tilt) * dist);
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
   requestRender();
