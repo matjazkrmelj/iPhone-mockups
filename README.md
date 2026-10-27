@@ -15,7 +15,7 @@ npm run dev
 
 Then open http://localhost:5173.
 
-Live version: https://matjazkrmelj.github.io/iphone-mockups/ (deployed by GitHub Actions on every push to `main`).
+Live version: https://matjazkrmelj.github.io/iPhone-mockups/ (deployed by GitHub Actions on every push to `main`).
 
 To build a static version: `npm run build` (output in `dist/`, serve with `npm run preview`).
 
