@@ -131,6 +131,9 @@ export function createCustomPhone(model, variant) {
     if (!o.isMesh) return;
     if (!materials.has(o.material)) materials.set(o.material, o.material.clone());
     o.material = materials.get(o.material);
+    // Models are often built from open surfaces (screen, glass, back panel), which the shadow map
+    // skips when it draws back faces only, letting light through. Both sides block light.
+    o.material.shadowSide = THREE.DoubleSide;
     o.castShadow = true;
     if ((o.name || o.uuid) === variant.screen && !screen) screen = o;
   });
@@ -154,8 +157,8 @@ export function createCustomPhone(model, variant) {
   if (uv) for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
   screen.geometry = geometry;
   const screenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  screenMat.shadowSide = THREE.DoubleSide;
   screen.material = screenMat;
-  screen.castShadow = false;
 
   // Glass reflection layer on the screen, as in phone.js.
   const reflection = new THREE.Mesh(geometry, new THREE.MeshPhysicalMaterial({
