@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { createPhone, placeholderCanvas } from './phone.js';
 import { MODELS, MODEL_BY_ID } from './models.js';
-import { createGlbPhone } from './glbPhone.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -50,21 +49,23 @@ function requestRender() {
 // ---------- Phones ----------
 // Each phone has its own model, screenshot, rotation, colour and position. The sidebar edits the selected one.
 const MAX_PHONES = 3;
-const DETAILED = 'detailed';
 const placeholder = placeholderCanvas();
 const phones = []; // { model, obj, texture, rot: [x, y, z], color, offset: [side, forward] (mm) }
 let selected = 0;
 const sel = () => phones[selected];
 
-$('model').innerHTML = [17, 16, 15, 14, 13].map((gen) => {
-  const options = MODELS.filter((m) => m.name.startsWith(`iPhone ${gen}`) || (gen === 17 && m.id === 'air'))
-    .map((m) => `<option value="${m.id}">${m.name}</option>`);
-  if (gen === 14) options.unshift(`<option value="${DETAILED}">iPhone 14 Pro (detailed)</option>`);
-  return `<optgroup label="iPhone ${gen}">${options.join('')}</optgroup>`;
-}).join('');
-$('model').value = DETAILED;
+$('model').innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
 
-const buildPhone = (model) => (model === DETAILED ? createGlbPhone() : Promise.resolve(createPhone(MODEL_BY_ID[model])));
+const buildPhone = (model) => createPhone(MODEL_BY_ID[model]);
+// Remove a phone's 3D object from the scene and free its GPU resources (the screenshot texture is kept).
+function disposePhone(obj) {
+  scene.remove(obj.group);
+  obj.group.traverse((o) => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    o.material.dispose();
+  });
+}
 
 function makeTexture(source) {
   const t = source instanceof HTMLCanvasElement ? new THREE.CanvasTexture(source) : new THREE.Texture(source);
@@ -146,23 +147,6 @@ window.addEventListener('paste', (e) => {
   if (item) loadFile(item.getAsFile());
 });
 
-// Model loads and adding phones are async; block other phone changes while one runs.
-let busy = false;
-async function whileBusy(fn) {
-  if (busy) return;
-  busy = true;
-  renderPhoneUI();
-  try {
-    await fn();
-  } catch (err) {
-    console.error(err);
-    alert('Could not load the 3D model.');
-  } finally {
-    busy = false;
-    renderPhoneUI();
-  }
-}
-
 function fillColorOptions() {
   $('frame').innerHTML = Object.entries(sel().obj.colors)
     .map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
@@ -175,9 +159,7 @@ function renderPhoneUI() {
     .map((_, i) => `<button data-phone="${i}" class="${i === selected ? 'active' : ''}">Phone ${i + 1}</button>`).join('');
   document.querySelectorAll('.multi-only').forEach((el) => { el.hidden = !multi; });
   document.querySelectorAll('.phone-name').forEach((el) => { el.textContent = multi ? ` · Phone ${selected + 1}` : ''; });
-  $('addPhone').disabled = busy || phones.length >= MAX_PHONES;
-  $('removePhone').disabled = busy;
-  $('model').disabled = busy;
+  $('addPhone').disabled = phones.length >= MAX_PHONES;
   const p = sel();
   $('model').value = p.model;
   fillColorOptions();
@@ -201,17 +183,14 @@ $('phoneTabs').addEventListener('click', (e) => {
 
 $('model').addEventListener('change', (e) => {
   const p = sel();
-  const model = e.target.value;
-  whileBusy(async () => {
-    const obj = await buildPhone(model);
-    scene.remove(p.obj.group);
-    p.obj = obj;
-    p.model = model;
-    scene.add(obj.group);
-    dressPhone(p);
-    updateLayout();
-    updateCamera();
-  });
+  disposePhone(p.obj);
+  p.model = e.target.value;
+  p.obj = buildPhone(p.model);
+  scene.add(p.obj.group);
+  dressPhone(p);
+  renderPhoneUI();
+  updateLayout();
+  updateCamera();
 });
 $('frame').addEventListener('change', (e) => {
   sel().color = e.target.value;
@@ -219,22 +198,23 @@ $('frame').addEventListener('change', (e) => {
   requestRender();
 });
 
-$('addPhone').addEventListener('click', () => whileBusy(async () => {
+$('addPhone').addEventListener('click', () => {
   if (phones.length >= MAX_PHONES) return;
   const src = sel();
-  const obj = await buildPhone(src.model);
+  const obj = buildPhone(src.model);
   const p = { model: src.model, obj, texture: makeTexture(placeholder), rot: [...src.rot], color: src.color, offset: [0, 0] };
   phones.push(p);
   scene.add(obj.group);
   dressPhone(p);
   selected = phones.length - 1;
+  renderPhoneUI();
   updateLayout();
   updateCamera();
-}));
+});
 $('removePhone').addEventListener('click', () => {
-  if (busy || phones.length <= 1) return;
+  if (phones.length <= 1) return;
   const [p] = phones.splice(selected, 1);
-  scene.remove(p.obj.group);
+  disposePhone(p.obj);
   p.texture.dispose();
   selected = Math.min(selected, phones.length - 1);
   renderPhoneUI();
@@ -394,8 +374,10 @@ function rowExtent() {
   const pos = rowPositions();
   const span = (vals) => Math.max(...vals) - Math.min(...vals);
   const height = Math.max(...phones.map((p) => p.obj.size.height));
+  // Allow for a phone turning: a portrait phone needs about 0.75 × its height, a wide one (the open Duo) its width.
+  const reach = Math.max(...phones.map((p) => Math.max(p.obj.size.height * 0.75, p.obj.size.width * 1.05)));
   return {
-    width: span(pos.map((p) => p.side)) + height * 0.75,
+    width: span(pos.map((p) => p.side)) + reach,
     height: height + (mode() === 'flat' ? span(pos.map((p) => p.forward)) : 0),
   };
 }
@@ -559,24 +541,13 @@ $('export').addEventListener('click', () => {
 });
 
 // ---------- Start ----------
-// Show a quick procedural phone, then swap in the detailed model once it has loaded.
 phones.push({
-  model: '14pro', obj: createPhone(MODEL_BY_ID['14pro']), texture: makeTexture(placeholder), rot: [0, 0, 0], color: 'spaceBlack', offset: [0, 0],
+  model: '17pro', obj: buildPhone('17pro'), texture: makeTexture(placeholder), rot: [0, 0, 0], color: 'silver', offset: [0, 0],
 });
 scene.add(phones[0].obj.group);
 dressPhone(phones[0]);
 renderPhoneUI();
 applyModeDefaults();
-whileBusy(async () => {
-  const p = phones[0];
-  const obj = await createGlbPhone();
-  scene.remove(p.obj.group);
-  p.obj = obj;
-  p.model = DETAILED;
-  scene.add(obj.group);
-  dressPhone(p);
-  updateLayout();
-});
 
 // Expose for debugging / automated tests.
 window.__mockup = { renderer, scene, camera, phones, loadFile };
