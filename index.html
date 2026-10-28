@@ -21,6 +21,14 @@
           <label for="model">Model</label>
           <select id="model"></select>
         </div>
+        <div class="button-row">
+          <label class="file-btn">
+            <input type="file" id="modelFile" accept=".glb,model/gltf-binary" />
+            Load your own model (.glb)
+          </label>
+          <button id="removeModel" hidden>Remove model</button>
+        </div>
+        <p class="hint" id="modelStatus"></p>
         <div class="row">
           <label for="frame">Colour</label>
           <select id="frame"></select>

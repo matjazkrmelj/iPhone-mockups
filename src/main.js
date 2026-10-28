@@ -3,6 +3,7 @@ import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import { createPhone, placeholderCanvas } from './phone.js';
 import { MODELS, MODEL_BY_ID } from './models.js';
 import { renderPhoto } from './photo.js';
+import { parseModel, createCustomPhone, storedModels, storeModel, deleteStoredModel } from './customModel.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -78,9 +79,21 @@ const phones = []; // { model, obj, texture, rot: [x, y, z], color, offset: [sid
 let selected = 0;
 const sel = () => phones[selected];
 
-$('model').innerHTML = MODELS.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
+// Models loaded from the user's own .glb files, by id ("custom-<stored id>-<variant>").
+const customModels = {}; // id -> { name, model, variant, storeId }
 
-const buildPhone = (model) => createPhone(MODEL_BY_ID[model]);
+function fillModelOptions() {
+  const options = (list) => list.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
+  const custom = Object.entries(customModels).map(([id, m]) => ({ id, name: m.name }));
+  $('model').innerHTML = options(MODELS)
+    + (custom.length ? `<optgroup label="Your models">${options(custom)}</optgroup>` : '');
+  if (phones.length) $('model').value = sel().model;
+}
+fillModelOptions();
+
+const buildPhone = (model) => (customModels[model]
+  ? createCustomPhone(customModels[model].model, customModels[model].variant)
+  : createPhone(MODEL_BY_ID[model]));
 // Remove a phone's 3D object from the scene and free its GPU resources (the screenshot texture is kept).
 function disposePhone(obj) {
   scene.remove(obj.group);
@@ -138,6 +151,10 @@ function setScreenImage(source) {
 }
 
 function loadFile(file) {
+  if (file && /\.glb$/i.test(file.name)) {
+    loadModelFile(file);
+    return;
+  }
   if (!file || !file.type.startsWith('image/')) return;
   const url = URL.createObjectURL(file);
   const img = new Image();
@@ -186,6 +203,7 @@ function renderPhoneUI() {
   $('addPhone').disabled = phones.length >= MAX_PHONES;
   const p = sel();
   $('model').value = p.model;
+  $('removeModel').hidden = !customModels[p.model];
   fillColorOptions();
   $('frame').value = p.color;
   axes.forEach((a, i) => { $(`rot${a}`).value = p.rot[i]; $(`rot${a}Out`).textContent = `${Math.round(p.rot[i])}°`; });
@@ -205,17 +223,65 @@ $('phoneTabs').addEventListener('click', (e) => {
   if (btn) selectPhone(+btn.dataset.phone);
 });
 
-$('model').addEventListener('change', (e) => {
-  const p = sel();
+function setModel(p, model) {
   disposePhone(p.obj);
-  p.model = e.target.value;
+  p.model = model;
   p.obj = buildPhone(p.model);
   scene.add(p.obj.group);
   dressPhone(p);
+}
+$('model').addEventListener('change', (e) => {
+  setModel(sel(), e.target.value);
   renderPhoneUI();
   updateLayout();
   updateCamera();
 });
+
+// ---------- Your own models (.glb) ----------
+// Kept only in this browser, so licensed models are never published with the site.
+async function addCustomModel(data, fileName, storeId) {
+  const model = await parseModel(data, fileName);
+  const ids = model.variants.map((variant, i) => {
+    const id = `custom-${storeId}-${i}`;
+    customModels[id] = { name: variant.label ? `${model.title} (${variant.label})` : model.title, model, variant, storeId };
+    return id;
+  });
+  fillModelOptions();
+  return ids;
+}
+
+async function loadModelFile(file) {
+  $('modelStatus').textContent = `Loading ${file.name}…`;
+  try {
+    const data = await file.arrayBuffer();
+    let storeId = `session${Date.now()}`;
+    try { storeId = await storeModel(file.name, data); } catch { /* storage unavailable: keep it for this session */ }
+    const [id] = await addCustomModel(data, file.name, storeId);
+    sel().color = 'original';
+    setModel(sel(), id);
+    renderPhoneUI();
+    updateLayout();
+    updateCamera();
+    $('modelStatus').textContent = '';
+  } catch (err) {
+    $('modelStatus').textContent = `Couldn't load ${file.name}: ${err.message}`;
+  }
+}
+
+$('modelFile').addEventListener('change', (e) => { loadModelFile(e.target.files[0]); e.target.value = ''; });
+$('removeModel').addEventListener('click', () => {
+  const custom = customModels[sel().model];
+  if (!custom) return;
+  const { storeId } = custom;
+  deleteStoredModel(storeId);
+  for (const id of Object.keys(customModels)) if (customModels[id].storeId === storeId) delete customModels[id];
+  for (const p of phones) if (!buildable(p.model)) setModel(p, '17pro');
+  fillModelOptions();
+  renderPhoneUI();
+  updateLayout();
+  updateCamera();
+});
+const buildable = (model) => model in MODEL_BY_ID || model in customModels;
 $('frame').addEventListener('change', (e) => {
   sel().color = e.target.value;
   sel().obj.setColor(e.target.value);
@@ -641,6 +707,12 @@ dressPhone(phones[0]);
 renderPhoneUI();
 applyModeDefaults();
 setEnvironment($('environment').value);
+storedModels().then(async (list) => {
+  if (!list.length) return;
+  $('modelStatus').textContent = 'Loading your models…';
+  for (const { id, name, data } of list) await addCustomModel(data, name, id).catch(() => {});
+  $('modelStatus').textContent = '';
+});
 
 // Expose for debugging / automated tests.
 window.__mockup = { renderer, scene, camera, phones, loadFile };
