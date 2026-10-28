@@ -27,13 +27,16 @@ To build a static version: `npm run build` (output in `dist/`, serve with `npm r
 - **Rotation**: drag a phone to turn it (Shift+drag rolls on Z, scroll wheel zooms), or use the X, Y and Z sliders (−180° to 180°). Double-click a slider, or click its value, to reset that axis. Presets for common angles.
 - **Scene**: zoom, background colour, transparent background.
 - **Surface**: choose whether the phones are *Standing* on a floor or *Lying flat* on a table. Shadows are cast onto that surface, which always touches the phones' lowest point whatever their rotation.
-- **Light**: key light direction and elevation (measured from the surface), strength, environment reflections, screen glare and exposure.
+- **Light**: a real-world lighting environment (studio, warehouse, lobby, apartment or city HDRI, which the phones reflect), key light direction and elevation (measured from the surface), strength, environment reflections, screen glare and exposure.
 - **Shadow**: on/off, opacity, softness, and the gap between the phone and the surface.
 - **Camera height**: look down at the scene (defaults to 20° when standing, 0° when lying flat).
-- **Export**: choose a format (fit the window, Square 1:1, Portrait 4:5, Story 9:16, Landscape 16:9, App Store 6.9″ at 1290 × 2796, or a custom size). Fixed formats show a frame of that shape, so the preview matches the PNG. Size multiplies the format by 1×–4×. With "Transparent background" on, the PNG has an alpha channel.
+- **Export**: choose a format (fit the window, Square 1:1, Portrait 4:5, Story 9:16, Landscape 16:9, App Store 6.9″ at 1290 × 2796, or a custom size). Fixed formats show a frame of that shape, so the preview matches the PNG. Size multiplies the format by 1×–4×. With "Transparent background" on, the PNG has an alpha channel. *Quality* picks how the PNG is rendered: *Fast* uses the live preview, while *Photo* (draft, high, best) path traces the scene for true reflections, soft shadows and light bouncing between surfaces. *Preview photo* renders that in the window first. Photo rendering takes from a few seconds to a minute or more depending on your GPU and the size.
 
 ## Files
 
 - `src/models.js` lists the iPhone models: dimensions, screen resolution, design features and colours.
 - `src/phone.js` builds an iPhone procedurally with Three.js from one of those models: a frame swept along a cross-section profile, cover glass with rounded edges, Dynamic Island or hole-punch camera, back glass, camera modules, Apple logo, antenna bands, port, grilles and buttons.
 - `src/main.js` handles the scene, sidebar controls, and export.
+- `src/photo.js` renders the photo-quality image with [three-gpu-pathtracer](https://github.com/gkjohnson/three-gpu-pathtracer), compositing the floor shadow onto the background.
+
+The lighting environments are CC0 HDRIs from [Poly Haven](https://polyhaven.com), via [@pmndrs/assets](https://github.com/pmndrs/assets).

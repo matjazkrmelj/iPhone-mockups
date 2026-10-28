@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import { createPhone, placeholderCanvas } from './phone.js';
 import { MODELS, MODEL_BY_ID } from './models.js';
+import { renderPhoto } from './photo.js';
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
@@ -11,14 +12,34 @@ const canvas = $('canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// Neutral tone mapping keeps screenshot colours true while still rolling off bright highlights.
+renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.VSMShadowMap;
 
 const scene = new THREE.Scene();
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// Image-based lighting from real photographed environments (CC0 HDRIs from Poly Haven, via @pmndrs/assets).
+const ENVIRONMENTS = {
+  studio: () => import('@pmndrs/assets/hdri/studio.exr.js'),
+  warehouse: () => import('@pmndrs/assets/hdri/warehouse.exr.js'),
+  lobby: () => import('@pmndrs/assets/hdri/lobby.exr.js'),
+  apartment: () => import('@pmndrs/assets/hdri/apartment.exr.js'),
+  city: () => import('@pmndrs/assets/hdri/city.exr.js'),
+};
+const envCache = {};
+async function setEnvironment(name) {
+  envCache[name] ??= ENVIRONMENTS[name]().then(async ({ default: url }) => {
+    const texture = await new EXRLoader().loadAsync(url);
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    return texture;
+  });
+  const texture = await envCache[name];
+  if ($('environment').value !== name) return;
+  scene.environment = texture;
+  requestRender();
+}
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 
@@ -37,7 +58,10 @@ scene.add(shadowPlane);
 
 // ---------- Render loop (on demand) ----------
 let pending = false;
+let photoRendering = false;
 function requestRender() {
+  if (photoRendering) return;
+  $('photoView').hidden = true;
   if (pending) return;
   pending = true;
   requestAnimationFrame(() => {
@@ -422,6 +446,8 @@ function updateLight() {
   // 100% key light = 3.0 intensity, strong enough to dominate the environment light.
   key.intensity = (v.lightInt / 100) * 3;
   scene.environmentIntensity = v.envInt / 100;
+  // Turn the environment with the key light, and stand it on the surface (its up is +y; flat mode's up is +z).
+  scene.environmentRotation.set(mode() === 'flat' ? Math.PI / 2 : 0, az, 0);
   renderer.toneMappingExposure = v.exposure / 100;
   for (const p of phones) p.obj.reflection.material.opacity = v.glare / 100;
   // Shadows come from the key light, so they fade out as it is dimmed.
@@ -522,13 +548,48 @@ function updateExportInfo() {
 }
 $('scale').addEventListener('change', updateExportInfo);
 
-$('export').addEventListener('click', () => {
-  const [w, h] = exportSize();
-  const prevRatio = renderer.getPixelRatio();
-  renderer.setPixelRatio(1);
-  renderer.setSize(w, h, false);
-  updateCamera(w, h);
-  renderer.render(scene, camera);
+const photoSamples = () => +$('quality').value;
+
+// Path-traced render into the WebGL canvas at the renderer's current size.
+let cancelPhoto = false;
+async function photo(onDone) {
+  const v = (id) => +$(id).value;
+  photoRendering = true;
+  cancelPhoto = false;
+  $('photoStatus').hidden = false;
+  try {
+    await renderPhoto({
+      renderer, scene, camera,
+      phones: phones.map((p) => p.obj),
+      floor: shadowPlane,
+      key,
+      softness: v('shadowSoft'),
+      samples: photoSamples(),
+      background: $('bg').value,
+      transparent: $('transparent').checked,
+      // The path-traced shadow is physically correct at the default opacity (18%).
+      shadowStrength: $('shadow').checked ? Math.min(2, v('shadowOpacity') / 18) : 0,
+      exposure: v('exposure') / 100,
+      onProgress: (f) => { $('photoProgress').textContent = `Rendering photo… ${Math.round(f * 100)}%`; },
+      isCancelled: () => cancelPhoto,
+    });
+    onDone();
+  } catch (err) {
+    if (err.message !== 'cancelled') {
+      console.error(err);
+      alert('Could not render the photo.');
+    }
+  } finally {
+    photoRendering = false;
+    $('photoStatus').hidden = true;
+    renderer.setClearColor($('bg').value, $('transparent').checked ? 0 : 1);
+  }
+}
+$('photoCancel').addEventListener('click', () => { cancelPhoto = true; });
+// Changing anything while a photo renders cancels it.
+$('sidebar').addEventListener('input', () => { if (photoRendering) cancelPhoto = true; });
+
+function downloadCanvas() {
   canvas.toBlob((blob) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -536,9 +597,40 @@ $('export').addEventListener('click', () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }, 'image/png');
+}
+
+$('export').addEventListener('click', async () => {
+  if (photoRendering) return;
+  const [w, h] = exportSize();
+  const prevRatio = renderer.getPixelRatio();
+  renderer.setPixelRatio(1);
+  renderer.setSize(w, h, false);
+  updateCamera(w, h);
+  if (photoSamples() > 0) {
+    await photo(downloadCanvas);
+  } else {
+    renderer.render(scene, camera);
+    downloadCanvas();
+  }
   renderer.setPixelRatio(prevRatio);
   layoutFrame();
 });
+
+// Show a path-traced render of the current view on top of the live view, until something changes.
+$('previewPhoto').addEventListener('click', () => {
+  if (photoRendering) return;
+  photo(() => {
+    const view = $('photoView');
+    view.width = canvas.width;
+    view.height = canvas.height;
+    view.getContext('2d').drawImage(canvas, 0, 0);
+    view.hidden = false;
+  });
+});
+$('quality').addEventListener('change', () => {
+  $('previewPhoto').disabled = photoSamples() === 0;
+});
+$('environment').addEventListener('change', (e) => setEnvironment(e.target.value));
 
 // ---------- Start ----------
 phones.push({
@@ -548,6 +640,7 @@ scene.add(phones[0].obj.group);
 dressPhone(phones[0]);
 renderPhoneUI();
 applyModeDefaults();
+setEnvironment($('environment').value);
 
 // Expose for debugging / automated tests.
 window.__mockup = { renderer, scene, camera, phones, loadFile };

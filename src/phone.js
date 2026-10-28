@@ -252,7 +252,7 @@ export function createPhone(spec) {
 
   // ---------- Front ----------
   const screenMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
-  add(roundedPlane(SW, SH, SR), screenMat, 0, 0, frontZ + 0.0003);
+  const screen = add(roundedPlane(SW, SH, SR), screenMat, 0, 0, frontZ + 0.0003);
 
   // Dynamic Island with the front camera and Face ID sensors faintly visible inside it, or a
   // hole-punch camera (iPhone Duo outer screen). The open Duo's inner camera is under the display.
@@ -513,6 +513,7 @@ export function createPhone(spec) {
 
   return {
     group,
+    screen,
     screenMat,
     island,
     reflection,

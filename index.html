@@ -94,6 +94,16 @@
           <input type="range" id="camTilt" min="0" max="60" step="1" value="0" />
         </div>
         <div class="row">
+          <label for="environment">Lighting</label>
+          <select id="environment">
+            <option value="studio" selected>Studio</option>
+            <option value="warehouse">Warehouse</option>
+            <option value="lobby">Lobby</option>
+            <option value="apartment">Apartment</option>
+            <option value="city">City</option>
+          </select>
+        </div>
+        <div class="row">
           <label for="bg">Background</label>
           <input type="color" id="bg" value="#e9ecf1" />
         </div>
@@ -158,6 +168,17 @@
       <section>
         <h2>Export</h2>
         <div class="row">
+          <label for="quality">Quality</label>
+          <select id="quality">
+            <option value="0">Fast (live view)</option>
+            <option value="64">Photo · draft</option>
+            <option value="256" selected>Photo · high</option>
+            <option value="1024">Photo · best</option>
+          </select>
+        </div>
+        <button id="previewPhoto" class="wide">Preview photo</button>
+        <p class="hint">Photo quality is path traced: real reflections, soft shadows and light bouncing between surfaces. It takes a few seconds to render.</p>
+        <div class="row">
           <label for="format">Format</label>
           <select id="format">
             <option value="viewport">Fit window</option>
@@ -191,7 +212,14 @@
     </aside>
 
     <main id="stage">
-      <div id="frame-box"><canvas id="canvas"></canvas></div>
+      <div id="frame-box">
+        <canvas id="canvas"></canvas>
+        <canvas id="photoView" hidden></canvas>
+      </div>
+      <div id="photoStatus" hidden>
+        <span id="photoProgress">Rendering photo…</span>
+        <button id="photoCancel">Cancel</button>
+      </div>
       <div id="drop">Drop screenshot</div>
     </main>
 
